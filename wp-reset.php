@@ -9,9 +9,9 @@ Author URI: https://github.com/chrisberthe
 License: GNU General Public License
 */
 
-if ( ! class_exists('WP_Reset') && is_admin() ) :
+if ( ! class_exists('cb_wp_reset') && is_admin() ) :
 
-	class WP_Reset 
+	class cb_wp_reset
 	{
 		/**
 		 * Nonce value
@@ -31,7 +31,7 @@ if ( ! class_exists('WP_Reset') && is_admin() ) :
 			add_action('admin_footer', array($this, 'add_admin_javascript'));
 			add_action('admin_menu', array($this, 'add_admin_menu'));
 			add_filter('contextual_help', array($this, 'add_contextual_help'), 10, 2);
-			add_filter('wp_mail', array($this, '_fix_password_mail'));
+			add_filter('wp_mail', array($this, '_fix_mail'));
 		}
 		
 		/**
@@ -53,7 +53,7 @@ if ( ! class_exists('WP_Reset') && is_admin() ) :
 				$public = get_option('blog_public');
 				
 				$admin_user = get_userdatabylogin('admin');				
-				$user = ( ! $admin_user || $admin_user->wp_user_level < 10 ) ? $current_user : $admin_user;
+				$user = ( ! $admin_user || ! user_can( $admin_user->ID, 'update_core' ) ) ? $current_user : $admin_user;
 				
 				// Run through the database columns and drop all the tables
 				if ( $db_tables = $wpdb->get_col("SHOW TABLES LIKE '{$wpdb->prefix}%'") )
@@ -64,14 +64,19 @@ if ( ! class_exists('WP_Reset') && is_admin() ) :
 					}
 					
 					// Return user keys and import variables
-					$keys = wp_install($blog_title, $user->user_login, $user->user_email, $public);					
+					$keys = wp_install($blog_title, $user->user_login, $user->user_email, $public);			
 					$this->_wp_update_user($user, $keys);
-					
-					// Reactivate the plugin after reinstalling
+				}
+				
+				// Reactivate the plugin after reinstalling
+				if ( isset($_POST['wp-reset-check']) && $_POST['wp-reset-check'] == 'true' )
+				{
 					update_option('active_plugins', array(plugin_basename(__FILE__)));
-
 					wp_redirect(admin_url($pagenow) . '?page=wp-reset&reset=success'); exit();
 				}
+				
+				// If the wp-reset-check isn't checked just redirect user to dashboard
+				wp_redirect(admin_url()); exit();
 			}
 		}
 		
@@ -100,21 +105,27 @@ if ( ! class_exists('WP_Reset') && is_admin() ) :
 			<div class="wrap">
 				<?php screen_icon() ?>
 				<h2><?php _e('Database Reset', 'wp-reset') ?></h2>
-				<p>Please type in (or copy/paste) the generated value into the text box:&nbsp;&nbsp;<strong><?php echo $random_string ?></strong></p>
+				<p><?php _e('Please type in (or copy/paste) the generated value into the text box', 'wp-reset') ?>:&nbsp;&nbsp;<strong><?php echo $random_string ?></strong></p>
 				<form action="" method="POST" id="wp-reset-form">
 					<?php wp_nonce_field('wp-nonce-submit', $this->_nonce) ?>
 					<input type="hidden" name="wp-random-value" value="<?php echo $random_string ?>" id="wp-random-value" />
 					<input type="text" name="wp-reset-input" value="" id="wp-reset-input" />
 					<input type="submit" name="wp-reset-submit" value="<?php _e('Reset Database', 'wp-reset') ?>" id="wp-reset-submit" class="button-primary" />
+					<p>
+						<label for="wp-reset-check">
+							<input type="checkbox" name="wp-reset-check" id="wp-reset-check" checked="checked" value="true" />
+						<?php _e('Reactivate plugin after resetting?', 'wp-reset') ?>
+						</label>
+					</p>
 				</form>
 				
-				<?php if ( ! $admin_user || $admin_user->wp_user_level < 10 ) : ?>
+				<?php if ( ! $admin_user || ! user_can( $admin_user->ID, 'update_core' ) ) : ?>
 					<p style="margin-top: 25px"><?php printf(__('The default user <strong><u>admin</u></strong> was never created for this WordPress install. So <strong><u>%s</u></strong> will be recreated with its current password instead', 'wp-reset'), $current_user->user_login) ?>.</p>
 				<?php else : ?>
 					<p><?php _e('The default user <strong><u>admin</u></strong> will be recreated with its current password upon resetting', 'wp-reset') ?>.</p>
 				<?php endif; ?>
 				
-				<p><?php _e('Note that once you reset the database, all users will be deleted except the initial admin user. The plugin will also reactivate itself after resetting', 'wp-reset') ?>.</p>
+				<p><?php _e('Note that once you reset the database, all users will be deleted except the initial admin user.', 'wp-reset') ?></p>
 			</div>
 <?php	}
 		
@@ -151,10 +162,8 @@ if ( ! class_exists('WP_Reset') && is_admin() ) :
 		 * @return void
 		 */
 		function add_admin_menu()
-		{
-			global $current_user;
-			
-			if ( current_user_can('update_core') && $current_user->wp_user_level == 10)
+		{			
+			if ( current_user_can( 'update_core' ) )
 			{
 				$this->_hook = add_submenu_page('tools.php', 'Database Reset', 'Database Reset', 'update_core', 'wp-reset', array($this, 'show_admin_page'));
 			}
@@ -226,7 +235,7 @@ if ( ! class_exists('WP_Reset') && is_admin() ) :
 		 * @access private
 		 * @return $mail Version with password changed
 		 */
-		function _fix_password_mail($mail)
+		function _fix_mail($mail)
 		{
 			$subject = __('WordPress Database Reset', 'wp-reset');
 			$message = __('The WordPress database has been successfully reset to its default settings:', 'wp-reset');
@@ -297,8 +306,8 @@ if ( ! class_exists('WP_Reset') && is_admin() ) :
 		
 	}
 
-	$wp_reset = new WP_Reset();
+	$cb_wp_reset = new cb_wp_reset();
 	
-	register_activation_hook( __FILE__, array('WP_Reset', 'plugin_activate') );
+	register_activation_hook( __FILE__, array('cb_wp_reset', 'plugin_activate') );
 
 endif;
