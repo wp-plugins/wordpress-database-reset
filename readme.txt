@@ -37,6 +37,10 @@ There are two important reasons as to why I built this plugin:
 1. The plugin page - a more secure way of resetting your database.
 
 == Changelog ==
+= 1.3 =
+* Replaced reactivation option for all currently active plugins (not just this plugin)
+* Updated language files
+
 = 1.2 =
 * Added capability to manually select whether or not plugin should be reactivated upon reset
 * Modified class name to avoid potential conflicts with WordPress core
