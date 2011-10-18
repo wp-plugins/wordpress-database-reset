@@ -37,6 +37,11 @@ There are two important reasons as to why I built this plugin:
 1. The plugin page - a more secure way of resetting your database.
 
 == Changelog ==
+= 1.4 =
+* Made quite a few changes to the translation files
+* Renamed french translation file for plugin format, not theme format
+* Optimized (until potential version 2.0)
+
 = 1.3 =
 * Replaced reactivation option for all currently active plugins (not just this plugin)
 * Updated language files
