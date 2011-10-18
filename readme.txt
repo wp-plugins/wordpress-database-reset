@@ -5,7 +5,7 @@ Tags: wordpress, database, database-reset, default-settings, default, wp-reset, 
 License: GPL2
 Requires at least: 3.0
 Tested up to: 3.2.1
-Stable tag: 1.3
+Stable tag: 1.4
 
 A secure and easy way to reinitialize the WordPress database to its default settings.
 
