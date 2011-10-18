@@ -13,9 +13,7 @@ A secure and easy way to reinitialize the WordPress database to its default sett
 
 WordPress Database Reset is a secure and easy way to reinitialize your WordPress database back to its default settings without actually having to reinstall WordPress yourself.
 
-Theme and plugin developers tend to forget to clean up after themselves and lots of junk gets piled into the WordPress database (most likely the wp_options table).
-
-This plugin allows you to securely reset the database, deleting everything except the admin user. The plugin makes sure the only access it will grant is to administrators with a user level of 10. Also, the form uses nonces (read more about them at <a href="http://codex.wordpress.org/WordPress_Nonces">WordPress nonces</a>) which adds another level of security to your application.
+This plugin will come in handy for both theme and plugin developers. There are different use case scenarios - one of which is being able to easily erase excess junk in the wp_options table that accumulates over time. Another would be to simply obtain a fresh install of the WordPress database after experimenting with various back-end options.
 
 == Installation ==
 
@@ -28,10 +26,7 @@ to the plugin page.
 
 = Why reset the database? =
 
-There are two important reasons as to why I built this plugin:
-
-1. I wanted a simple and painless way to obtain a fresh clean database without actually having to reinstall WordPress.
-2. 9 times out of 10 I get tons of excess junk in the wp_options table after installing plugins and themes that do not clean up after themselves.
+I wanted a simple and painless way to obtain a fresh clean database without actually having to reinstall WordPress. Plus, 9 times out of 10 I get tons of excess junk in the wp_options table after installing plugins and themes that do not clean up after themselves.
 
 == Screenshots ==
 1. The plugin page - a more secure way of resetting your database.
