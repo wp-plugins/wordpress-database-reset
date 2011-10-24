@@ -3,8 +3,8 @@
 Plugin Name: WordPress Database Reset
 Plugin URI: https://github.com/chrisberthe/wordpress-database-reset
 Description: A plugin that allows you to reset the database to WordPress's initial state.
-Version: 1.4
-Author: Chris Berthe
+Version: 2.0
+Author: Chris Berthe ☻
 Author URI: https://github.com/chrisberthe
 License: GNU General Public License
 */
@@ -24,6 +24,16 @@ if ( ! class_exists('cb_wp_reset') && is_admin() ) :
 		private $_active_plugins;
 		
 		/**
+		 * Tables to preserve
+		 */
+		private $_tables;
+		
+		/**
+		 * WordPress database tables
+		 */
+		private $_wp_tables;
+		
+		/**
 		 * Loads default options
 		 *
 		 * @return void
@@ -33,6 +43,7 @@ if ( ! class_exists('cb_wp_reset') && is_admin() ) :
 			add_action('init', array($this, 'init_language'));
 			add_action('admin_init', array($this, 'wp_reset_init'));
 			add_action('admin_init', array($this, '_redirect_user'));
+			add_action('admin_init', array($this, 'add_plugin_styles_and_scripts'));
 			add_action('admin_footer', array($this, 'add_admin_javascript'));
 			add_action('admin_menu', array($this, 'add_admin_menu'));
 			add_filter('contextual_help', array($this, 'add_contextual_help'), 10, 2);
@@ -49,16 +60,39 @@ if ( ! class_exists('cb_wp_reset') && is_admin() ) :
 		{
 			global $wpdb, $current_user, $pagenow;
 			
+			// Grab the WordPress database tables
+			$this->_wp_tables = $wpdb->tables();
+			
+			// Check for valid input - goes ahead and drops / resets tables
 			if ( isset($_POST['wp-random-value'], $_POST['wp-reset-input']) && $_POST['wp-random-value'] == $_POST['wp-reset-input'] 
 				&& check_admin_referer('wp-nonce-submit', $this->_nonce) )
-			{
-				require_once( ABSPATH . '/wp-admin/includes/upgrade.php' );
+			{				
+				require_once(ABSPATH . '/wp-admin/includes/upgrade.php');
 				
+				// No tables were selected
+				if ( ! isset($_POST['tables']) && empty($_POST['tables']) )
+				{
+					wp_redirect(admin_url($pagenow) . '?page=wp-reset&reset=no-select'); exit();
+				}
+				
+				// Get current options
 				$blog_title = get_option('blogname');
 				$public = get_option('blog_public');
+
+				$admin_user = get_userdatabylogin('admin');
+				$user = ( ! $admin_user || ! user_can($admin_user->ID, 'update_core') ) ? $current_user : $admin_user;
 				
-				$admin_user = get_userdatabylogin('admin');				
-				$user = ( ! $admin_user || ! user_can( $admin_user->ID, 'update_core' ) ) ? $current_user : $admin_user;
+				// Get the selected tables
+				$tables = (isset($_POST['tables'])) ? array_flip($_POST['tables']) : array();
+
+				// Compare the selected tables against the ones in the database
+				$this->_tables = array_diff_key($this->_wp_tables, $tables);
+				
+				// Preserve the data from the tables that are unique
+				if ( count($this->_tables) > 0 )
+				{
+					$backup_tables = $this->_backup_tables($this->_tables);
+				}
 				
 				// Grab the currently active plugins
 				if ( isset($_POST['wp-reset-check']) && $_POST['wp-reset-check'] == 'true' )
@@ -69,19 +103,31 @@ if ( ! class_exists('cb_wp_reset') && is_admin() ) :
 				// Run through the database columns and drop all the tables
 				if ( $db_tables = $wpdb->get_col("SHOW TABLES LIKE '{$wpdb->prefix}%'") )
 				{
-					foreach ( $db_tables as $db_table )
+					foreach ($db_tables as $db_table)
 					{
 						$wpdb->query("DROP TABLE {$db_table}");
 					}
-					
+
 					// Return user keys and import variables
-					$keys = wp_install($blog_title, $user->user_login, $user->user_email, $public);			
+					$keys = wp_install($blog_title, $user->user_login, $user->user_email, $public);
 					$this->_wp_update_user($user, $keys);
 				}
-				
-				// Reactivate the plugins after reinstalling
-				if ( $this->_reactivate_plugins() )
+					
+				// Delete and replace tables with the backed up table data
+				if ( count($this->_tables) > 0 )
 				{
+					foreach ($this->_tables as $table)
+					{
+						$wpdb->query("DELETE FROM " . $table);
+					}
+					
+					$this->_backup_tables($backup_tables, 'reset');
+				}
+				
+				if ( ! empty($this->_active_plugins) )
+				{
+					$wpdb->update($wpdb->options, array('option_value' => $this->_active_plugins), array('option_name' => 'active_plugins'));
+					
 					wp_redirect(admin_url($pagenow) . '?page=wp-reset&reset=success'); exit();
 				}
 				
@@ -108,6 +154,8 @@ if ( ! class_exists('cb_wp_reset') && is_admin() ) :
 ?>
 			<?php if ( isset($_POST['wp-random-value'], $_POST['wp-reset-input']) && $_POST['wp-random-value'] != $_POST['wp-reset-input'] ) : ?>
 				<div class="error"><p><strong><?php _e('You entered the wrong value - please try again', 'wp-reset') ?>.</strong></p></div>
+			<?php elseif ( isset($_GET['reset']) && $_GET['reset'] == 'no-select') : ?>
+				<div class="error"><p><strong><?php _e('You did not select any database tables', 'wp-reset') ?>.</strong></p></div>
 			<?php elseif ( isset($_GET['reset']) && $_GET['reset'] == 'success' ) : ?>
 				<div class="updated"><p><strong><?php _e('The WordPress database has been reset successfully', 'wp-reset') ?>.</strong></p></div>
 			<?php endif ?>
@@ -115,21 +163,33 @@ if ( ! class_exists('cb_wp_reset') && is_admin() ) :
 			<div class="wrap">
 				<?php screen_icon() ?>
 				<h2><?php _e('Database Reset', 'wp-reset') ?></h2>
-				<p><?php _e('Please type in (or copy/paste) the generated value into the text box', 'wp-reset') ?>:&nbsp;&nbsp;<strong><?php echo $random_string ?></strong></p>
 				<form action="" method="POST" id="wp-reset-form">
+					<p><?php _e('Please choose from the following database tables the ones you would like to reset', 'wp-reset') ?>:</p>
+					<div id="select-buttons">
+						<span><a href='#' id="select-all"><?php _e('Select All', 'wp-reset') ?></a></span>
+						<select id="wp-tables" multiple="multiple" name="tables[]" onchange="changeHandler()">
+							<?php foreach ($this->_wp_tables as $key => $value) : ?>
+								<option><?php echo $key ?></option>
+							<?php endforeach ?>
+						</select>
+					</div>
+					<p><?php _e('Type in (or copy/paste) the generated value into the text box', 'wp-reset') ?>:&nbsp;&nbsp;<strong><?php echo $random_string ?></strong></p>
 					<?php wp_nonce_field('wp-nonce-submit', $this->_nonce) ?>
 					<input type="hidden" name="wp-random-value" value="<?php echo $random_string ?>" id="wp-random-value" />
 					<input type="text" name="wp-reset-input" value="" id="wp-reset-input" />
 					<input type="submit" name="wp-reset-submit" value="<?php _e('Reset Database', 'wp-reset') ?>" id="wp-reset-submit" class="button-primary" />
-					<p>
-						<label for="wp-reset-check">
-							<input type="checkbox" name="wp-reset-check" id="wp-reset-check" checked="checked" value="true" />
-						<?php _e('Reactivate current plugins after reset?', 'wp-reset') ?>
-						</label>
-					</p>
+					<img src="<?php echo plugins_url('css/i/ajax-loader.gif', __FILE__) ?>" alt="loader" id="loader" style="display: none" />
+					<div id="reactivate" style="display: none">
+						<p>
+							<label for="wp-reset-check">
+								<input type="checkbox" name="wp-reset-check" id="wp-reset-check" checked="checked" value="true" />
+							<?php _e('Reactivate current plugins after reset?', 'wp-reset') ?>
+							</label>
+						</p>
+					</div>
 				</form>
 				
-				<?php if ( ! $admin_user || ! user_can( $admin_user->ID, 'update_core' ) ) : ?>
+				<?php if ( ! $admin_user || ! user_can($admin_user->ID, 'update_core') ) : ?>
 					<p style="margin-top: 25px"><?php printf(__('The default user <strong><u>admin</u></strong> was never created for this WordPress install. So <strong><u>%s</u></strong> will be recreated with its current password instead', 'wp-reset'), $current_user->user_login) ?>.</p>
 				<?php else : ?>
 					<p><?php _e('The default user <strong><u>admin</u></strong> will be recreated with its current password upon resetting', 'wp-reset') ?>.</p>
@@ -149,15 +209,34 @@ if ( ! class_exists('cb_wp_reset') && is_admin() ) :
 		{
 ?>
 			<script type="text/javascript">
-			/* <![CDATA[ */
-				jQuery('#wp-reset-submit').click(function() {
-					var message = "<?php _e('Clicking OK will result in your database being reset to its initial settings. Continue?', 'wp-reset') ?>";
-					var reset = confirm(message);
+			/* <![CDATA[ */				
+				jQuery(function($) {
+					$('#wp-tables').bsmSelect({
+						animate: true,
+						title: "<?php _e('Select Table', 'wp-reset') ?>",
+						plugins: [$.bsmSelect.plugins.compatibility()]
+					});
 					
-					if ( reset ) {
-						jQuery('#wp-reset-form').submit();
-					} else {
+					$("#select-all").click(function() {
+						$("#wp-tables").children().attr("selected", "selected").end().change();
 						return false;
+					});
+					
+					$('#wp-reset-submit').click(function() {
+						var message = "<?php _e('Clicking OK will result in your database being reset to its initial settings. Continue?', 'wp-reset') ?>";
+						var reset = confirm(message);
+
+						if (reset) {
+							$('#wp-reset-form').submit();
+							$('#loader').show();
+						} else {
+							return false;
+						}
+					});
+					
+					window.changeHandler = function() {
+					    var op = $("#wp-tables option[value='options']:selected");
+					    $('#reactivate').toggle(op.length > 0);
 					}
 				});
 			/* ]]> */
@@ -173,7 +252,7 @@ if ( ! class_exists('cb_wp_reset') && is_admin() ) :
 		 */
 		function add_admin_menu()
 		{			
-			if ( current_user_can( 'update_core' ) )
+			if ( current_user_can('update_core') )
 			{
 				$this->_hook = add_submenu_page('tools.php', 'Database Reset', 'Database Reset', 'update_core', 'wp-reset', array($this, 'show_admin_page'));
 			}
@@ -197,6 +276,22 @@ if ( ! class_exists('cb_wp_reset') && is_admin() ) :
 			}
 			
 			return $contextual_help;
+		}
+		
+		/**
+		 * Adds any plugin styles to our page
+		 *
+		 * @access public
+		 * @return void
+		 */
+		function add_plugin_styles_and_scripts()
+		{
+			wp_enqueue_style('wordpress-reset-css', plugins_url('css/wp-reset.css', __FILE__));
+			wp_enqueue_style('bsmselect-css', plugins_url('css/jquery.bsmselect.css', __FILE__));
+			
+			wp_enqueue_script('bsmselect', plugins_url('js/jquery.bsmselect.js', __FILE__));
+			wp_enqueue_script('bsmselect-compatibility', plugins_url('js/jquery.bsmselect.compatibility.js', __FILE__));
+			wp_enqueue_script('bsmselect-sortable', plugins_url('js/jquery.bsmselect.sortable.js', __FILE__));
 		}
 		
 		/**
@@ -248,7 +343,7 @@ if ( ! class_exists('cb_wp_reset') && is_admin() ) :
 		function _fix_mail($mail)
 		{
 			$subject = __('WordPress Database Reset', 'wp-reset');
-			$message = __('The WordPress database has been successfully reset to its default settings:', 'wp-reset');
+			$message = __('The tables you selected have been successfully reset to their default settings:', 'wp-reset');
 			$password = __('Password: The password you chose during the install.', 'wp-reset');
 						
 			if ( stristr($mail['message'], 'Your new WordPress site has been successfully set up at:') )
@@ -262,27 +357,56 @@ if ( ! class_exists('cb_wp_reset') && is_admin() ) :
 		}
 		
 		/**
-		 * Reactivates the plugins after reset
+		 * Preserves all the results from the tables the user
+		 * did not select from the drop-down. Also resets these
+		 * results back after reinstalling WordPress.
 		 *
 		 * @access private
-		 * @return TRUE on plugin reactivation, FALSE otherwise
+		 * @return array Backed up data if type backup, void if reset
 		 */
-		function _reactivate_plugins()
+		function _backup_tables($tables, $type = 'backup')
 		{
 			global $wpdb;
 			
-			if ( ! empty($this->_active_plugins) )
+			if ( is_array($tables) )
 			{
-				// Replace the list of plugins with the 'old' list after the reset
-				$query = $wpdb->prepare("UPDATE $wpdb->options SET option_value = %s WHERE option_name = %s", $this->_active_plugins, 'active_plugins');
-				
-				if ( $wpdb->query($query) )
+				switch ($type)
 				{
-					return TRUE;
+					case 'backup':
+					$backup_tables = array();
+					
+					foreach ($tables as $table)
+					{
+						$backup_tables[$table] = $wpdb->get_results("SELECT * FROM " . $table);
+					}
+					
+					return $backup_tables;
+					break;
+					
+					case 'reset':
+					// Outer array of tables
+					foreach ($tables as $table_name => $table_data)
+					{
+						// Array of table rows
+						foreach ($table_data as $row)
+						{
+							$columns = $values = array();
+							
+							// Loop through current object row
+							foreach ($row as $column => $value)
+							{
+								$columns[] = $column;
+								$values[] = $wpdb->escape($value);
+							}
+							
+							$wpdb->query("INSERT INTO $table_name (" . implode(', ', $columns) . ") VALUES ('" . implode("', '", $values) . "')");
+						}
+					}
+					break;
 				}
 			}
 			
-			return FALSE;
+			return;
 		}
 		
 		/**
