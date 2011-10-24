@@ -32,6 +32,13 @@ I wanted a simple and painless way to obtain a fresh clean database without actu
 1. The plugin page - a more secure way of resetting your database.
 
 == Changelog ==
+= 2.0 =
+* Added functionality to be able to select which tables you want to reset, rather than having to reset the entire database.
+* Added bsmSelect for the multiple select.
+* Modified screenshot-1.png.
+* Fixed redirect bug
+* 'Reactivate current plugins after reset' only shows if the options table is selected from the dropdown.
+
 = 1.4 =
 * Made quite a few changes to the translation files
 * Renamed french translation file for plugin format, not theme format
