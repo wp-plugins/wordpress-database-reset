@@ -1,17 +1,17 @@
 === WordPress Database Reset ===
 
 Contributors: mousesports
-Tags: wordpress, database, database-reset, development, default-settings, default, wp-reset, security, secure
+Tags: wordpress, database, database-reset, restore, setup, development, default-settings, default, wp-reset, security, secure
 License: GPL2
-Requires at least: 3.0
-Tested up to: 3.5
-Stable tag: 2.1
+Requires at least: 3.5
+Tested up to: 3.7.1
+Stable tag: 2.3
 
-A secure and easy way to reinitialize the WordPress database to its default settings.
+A simple way to reset the database to the state of WordPress right after you install it for the first time.
 
 == Description ==
 
-WordPress Database Reset is a secure and easy way to reinitialize your WordPress database back to its default settings without actually having to reinstall WordPress yourself.
+WordPress Database Reset allows for a secure and easy way to reinitialize your WordPress database back to its default settings without having to reinstall WordPress yourself.
 
 This plugin will come in handy for both theme and plugin developers. There are different use case scenarios - one of which is being able to easily erase excess junk in the wp_options table that accumulates over time. Another would be to simply obtain a fresh install of the WordPress database after experimenting with various back-end options.
 
@@ -22,16 +22,21 @@ then activate the plugin. You could also use the built-in Add New Plugin
 feature within WordPress. After activating, you will automatically be redirected
 to the plugin page.
 
-== Frequently Asked Questions ==
-
-= Why reset the database? =
-
-I wanted a simple and painless way to obtain a fresh clean database without actually having to reinstall WordPress. Plus, 9 times out of 10 I get tons of excess junk in the wp_options table after installing plugins and themes that do not clean up after themselves.
-
 == Screenshots ==
 1. The plugin page - a more secure way of resetting your database.
 
 == Changelog ==
+= 2.3 =
+* Removed deprecated function $wpdb->escape(), replaced with esc_sql()
+* Add German translation, thanks to Ulrich Pogson
+* Updated screenshot-1.png
+* Renamed default localization file
+* Fixed broken if conditional during code clean up for version 2.2
+
+= 2.2 =
+* Fixed scripts and styles to only load on plugin page
+* Formatted code to meet WordPress syntax standards
+
 = 2.1 =
 * Replaced 3.3 deprecated get_userdatabylogin() with get_user_by()
 * Updated deprecated add_contextual_help() with add_help_tab()
