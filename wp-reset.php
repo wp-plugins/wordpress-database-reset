@@ -3,7 +3,7 @@
 Plugin Name: WordPress Database Reset
 Plugin URI: https://github.com/chrisberthe/wordpress-database-reset
 Description: A plugin that allows you to reset the database to WordPress's initial state.
-Version: 2.3
+Version: 2.3.1
 Author: Chris Berthe ☻
 Author URI: https://github.com/chrisberthe
 License: GNU General Public License
@@ -140,9 +140,9 @@ if ( ! class_exists('CB_WP_Reset') && is_admin() ) :
 					<p><?php _e('Please choose from the following database tables the ones you would like to reset', 'wp-reset') ?>:</p>
 					<div id="select-buttons">
 						<span><a href='#' id="select-all"><?php _e('Select All', 'wp-reset') ?></a></span>
-						<select id="wp-tables" multiple="multiple" name="tables[]" onchange="changeHandler()">
+						<select id="wp-tables" multiple="multiple" name="tables[]">
 							<?php foreach ( $this->_wp_tables as $key => $value ) : ?>
-								<option><?php echo $key ?></option>
+								<option value="<?php echo $key ?>"><?php echo $key ?></option>
 							<?php endforeach ?>
 						</select>
 					</div>
@@ -207,10 +207,9 @@ if ( ! class_exists('CB_WP_Reset') && is_admin() ) :
 						}
 					});
 					
-					window.changeHandler = function() {
-					    var op = $("#wp-tables option[value='options']:selected");
-					    $('#reactivate').toggle(op.length > 0);
-					}
+					$('#wp-tables').change(function() {
+						$('#reactivate').toggle($("option[value='options']:selected", this).length > 0);
+					});
 					
 				})(jQuery);
 			/* ]]> */
