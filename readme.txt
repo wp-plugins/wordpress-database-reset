@@ -4,8 +4,8 @@ Contributors: mousesports
 Tags: wordpress, database, database-reset, restore, setup, development, default-settings, default, wp-reset, security, secure
 License: GPL2
 Requires at least: 3.0
-Tested up to: 3.7.1
-Stable tag: 2.3.1
+Tested up to: 4.2.2
+Stable tag: 2.3.2
 
 A simple way to reset the database to the state of WordPress right after you install it for the first time.
 
@@ -26,6 +26,15 @@ to the plugin page.
 1. The plugin page - a more secure way of resetting your database.
 
 == Changelog ==
+= 2.3.2 =
+* Add option to keep active theme, thanks to Ulrich Pogson
+* Adhere to WordPress PHP coding syntax standards
+* Delete the user session and recreate it
+* Separate the backup_tables method into two new methods
+* Reset only WP tales and not custom tables
+* French language updates, thanks to Fx Benard
+* Fix for undefined variable: backup_tables
+
 = 2.3.1 =
 * Fixed bug where reactivate plugins div was not displaying on 'options' table select
 
